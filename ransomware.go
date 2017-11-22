@@ -7,6 +7,12 @@ import (
 	"io/ioutil"
 	"crypto/rand"
 	"math/big"
+	"log"
+	"math"
+	"encoding/hex"
+	"strconv"
+	"crypto/sha256"
+	"crypto/aes"
 )
 
 //addition, subtraction and multiplication
@@ -160,6 +166,146 @@ func find_rel_prime(phi *big.Int) *big.Int{
 
 	}
 	return bigi
+}
+
+//return the XOR on bitwise for two byte array
+func XoR(b1 []byte, b2 []byte) []byte{
+	xor := make([]byte, len(b1))
+	for i:= 0; i < len(b1); i ++{
+		xor[i] = b1[i] ^ b2[i]
+	}
+	//fmt.Printf("xor: %x\n", xor)
+	return xor
+}
+
+//return the padding byte array for the specific message M
+func PKCS_5(M []byte) []byte{
+
+	n := int(math.Mod(float64(len(M)),16.0))
+
+	if n == 0{
+		dst, _ := hex.DecodeString(strings.Repeat("10",16))
+		//fmt.Printf("padding: %x,%d\n",dst,dst)
+		return dst
+	}else{
+		s := fmt.Sprintf("0%x", 16-n)
+		//s := "0f"
+		dst, _ := hex.DecodeString(strings.Repeat(s,16-n))
+		//fmt.Printf("padding: %x,%d\n",dst,dst)
+		return dst
+	}
+}
+//use AES-128 in CBC mode to encrypt the message M
+func AES_CBC_ENC(Kenc []byte, IV []byte, M []byte) []byte{
+	var c []byte
+
+	block, err := aes.NewCipher(Kenc)
+	if err != nil{
+		panic(err)
+	}
+
+	for len(M) > 0{
+		block.Encrypt(IV, XoR(IV,M[:16]))
+		M = M[16:]
+		c = append(c, IV...)
+	}
+	return c
+	
+}
+//use AES-128 in CBC mode to decrypt the ciphertext C
+func AES_CBC_DEC(Kenc []byte, IV []byte, C []byte)[]byte{
+	var m []byte
+	temp := make([]byte, 16)
+
+	block, err := aes.NewCipher(Kenc)
+	if err != nil{
+		panic(err)
+	}
+
+	for len(C) > 0{
+
+		block.Decrypt(temp, C)
+		//fmt.Println(temp, len(C))
+		m = append(m, XoR(IV,temp)...)
+		IV = C[:16]
+		C = C[16:]
+	}
+
+	fmt.Println("IV:", IV)
+	return m
+}
+//return the checksum from HMAC_SHA256 algorithm
+func HMAC_SHA256(Kmac []byte, M []byte, B int) []byte{
+	var K0 []byte
+
+	ipad, _ := hex.DecodeString(strings.Repeat("36",B)) //inner pad
+	opad, _ := hex.DecodeString(strings.Repeat("5c",B))	//outer pad
+
+	if len(Kmac) < B{
+		dst, _ := hex.DecodeString(strings.Repeat("00", B - len(Kmac)))
+		K0 = append(Kmac, dst...)
+	}
+
+	h1 := sha256.New()
+	h1.Write(append(XoR(K0,ipad),M...))
+
+	h2 := sha256.New()
+	h2.Write(append(XoR(K0,opad),h1.Sum(nil)...))
+
+	return h2.Sum(nil)
+}
+
+//encrypt the message by using Key
+func encrypt(Kenc []byte, Kmac []byte, M []byte) []byte{
+	B := 64 //the Block size of SHA256
+	T := HMAC_SHA256(Kmac,M,B)
+
+	M_ := append(M, T...)
+	PS := PKCS_5(M_)
+	M__ := append(M_, PS...)
+
+	IV := make([]byte, 16)
+	rand.Read(IV)
+	IV_ := make([]byte, len(IV))
+	copy(IV_,IV)
+
+	C_ := AES_CBC_ENC(Kenc, IV_, M__)
+	C := append(IV, C_...)
+
+	return C
+}
+//decrypt the cipthertext by using the Key
+func decrypt(Kenc []byte, Kmac []byte, C []byte)[]byte{
+	IV := C[:16]
+	C_ := C[16:]
+	M__ := AES_CBC_DEC(Kenc, IV, C_)
+
+	last := len(M__) - 1
+	s := fmt.Sprintf("%d", M__[last])
+	number, _ := strconv.Atoi(s)
+	//h := M__[last-number + 1:]
+
+	for i := 1; i< number; i ++{
+		if s != fmt.Sprintf("%d", M__[last - i]){
+			fmt.Printf("INVALID PADDING")
+			os.Exit(0)
+		}
+	}
+
+	M_ := M__[:last - number + 1]
+	T := M_[len(M_)-32:]
+	//fmt.Println(len(M_))
+	M := M_[:len(M_)-32]
+	T_ := HMAC_SHA256(Kmac,M,64)
+	//fmt.Println(T_)
+	for i,hex := range T{
+		if T_[i] != hex{
+			fmt.Println("INVALID MAC")
+			os.Exit(0)
+		}
+	}
+	return M
+
 }
 
 func main(){
