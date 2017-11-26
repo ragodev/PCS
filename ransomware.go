@@ -1,15 +1,16 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
-	//"io/ioutil"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
+	"io/ioutil"
 	"math/big"
+	"os"
+	"strconv"
+	"strings"
+
 	//"log"
 	"crypto/aes"
 	"encoding/hex"
@@ -197,7 +198,7 @@ func PKCS_5(M []byte) []byte {
 		dst, _ = hex.DecodeString(strings.Repeat(s, 32-n))
 
 	}
-	fmt.Printf("need length: %d, padding: %x with length %d\n", 32-n, dst, len(dst))
+	//fmt.Printf("need length: %d, padding: %x with length %d\n", 32-n, dst, len(dst))
 	return dst
 
 }
@@ -239,7 +240,7 @@ func AES_CBC_DEC(Kenc []byte, IV []byte, C []byte) []byte {
 		C = C[32:]
 	}
 
-	fmt.Println("IV:", IV)
+	//fmt.Println("IV:", IV)
 	return m
 }
 
@@ -259,7 +260,7 @@ func encrypt(N *big.Int, e *big.Int, M []byte) []byte {
 	M_ := append(M, T...)
 	PS := PKCS_5(M_)
 	M__ := append(M_, PS...)
-
+	fmt.Printf("Msg: %x\n", M__)
 	IV := make([]byte, 32)
 	rand.Read(IV)
 	IV_ := make([]byte, len(IV))
@@ -269,46 +270,57 @@ func encrypt(N *big.Int, e *big.Int, M []byte) []byte {
 	rand.Read(Kenc)
 	C_ := AES_CBC_ENC(Kenc, IV_, M__)
 	C := append(IV, C_...)
-
+	fmt.Printf("MSG: %x\n", C)
+	decrypt(Kenc, C)
 	big_Kenc := new(big.Int).SetBytes(Kenc)
+	//fmt.Printf("IV:%x with length:%d\n", IV, len(IV))
+	//fmt.Printf("Kenc:%x with length:%d\n", Kenc, len(Kenc))
 	tmp := Fast_exp(big_Kenc, e, N)
-	Kenc_encrypted := []byte(tmp.String())
+	//fmt.Printf("Big_enc:%d\n", big_Kenc)
+	//fmt.Printf("encrption:%d\n", tmp)
+	Kenc_encrypted := tmp.Bytes()
+	//fmt.Printf("Header:%x\t with length:%d\n", Kenc_encrypted, len(Kenc_encrypted))
 	return append(Kenc_encrypted, C...)
 }
 
 //decrypt the cipthertext by using the Key
-// func decrypt(Kenc []byte, Kmac []byte, C []byte) []byte {
-// 	IV := C[:16]
-// 	C_ := C[16:]
-// 	M__ := AES_CBC_DEC(Kenc, IV, C_)
+func decrypt(Kenc []byte, C []byte) []byte {
+	fmt.Println("running")
+	Kmac := []byte("secret")
+	IV := C[:32]
+	C_ := C[32:]
+	M__ := AES_CBC_DEC(Kenc, IV, C_)
 
-// 	last := len(M__) - 1
-// 	s := fmt.Sprintf("%d", M__[last])
-// 	number, _ := strconv.Atoi(s)
-// 	//h := M__[last-number + 1:]
+	last := len(M__) - 1
+	s := fmt.Sprintf("%d", M__[last])
+	fmt.Printf("Msg: %x\n", M__)
+	number, _ := strconv.Atoi(s)
+	//padding := fmt.Sprintf("%d", M__[last-number:])
+	//fmt.Println("checking padding", padding, number)
+	for i := 1; i < number; i++ {
+		if s != fmt.Sprintf("%d", M__[last-i]) {
+			fmt.Println("INVALID PADDING")
+			os.Exit(0)
+		}
+	}
 
-// 	for i := 1; i < number; i++ {
-// 		if s != fmt.Sprintf("%d", M__[last-i]) {
-// 			fmt.Printf("INVALID PADDING")
-// 			os.Exit(0)
-// 		}
-// 	}
+	M_ := M__[:last-number+1]
+	T := M_[len(M_)-32:]
+	//fmt.Println(len(M_))
+	M := M_[:len(M_)-32]
+	T_ := HMAC_SHA256(Kmac, M)
+	//fmt.Println(T_)
+	fmt.Println("checking MAC")
+	for i, hex := range T {
+		if T_[i] != hex {
+			fmt.Println("INVALID MAC")
+			os.Exit(0)
+		}
+	}
+	fmt.Println("GOOD!")
+	return M
 
-// 	M_ := M__[:last-number+1]
-// 	T := M_[len(M_)-32:]
-// 	//fmt.Println(len(M_))
-// 	M := M_[:len(M_)-32]
-// 	T_ := HMAC_SHA256(Kmac, M, 64)
-// 	//fmt.Println(T_)
-// 	for i, hex := range T {
-// 		if T_[i] != hex {
-// 			fmt.Println("INVALID MAC")
-// 			os.Exit(0)
-// 		}
-// 	}
-// 	return M
-
-// }
+}
 
 func read_file(input_file string) []byte {
 
@@ -327,6 +339,20 @@ func read_file(input_file string) []byte {
 	return M
 }
 
+func load_key(input_file string) (*big.Int, *big.Int) {
+
+	data, _ := ioutil.ReadFile(input_file)
+	data_s := string(data[:])
+
+	keys := strings.Split(data_s[strings.Index(data_s, "(")+1:strings.Index(data_s, ")")], ",")
+	//e_s := data_s[strings.Index(data_s,",") + 1:strings.Index(data_s,")")]
+
+	N, _ := new(big.Int).SetString(keys[0], 10)
+	d, _ := new(big.Int).SetString(keys[1], 10)
+	return N, d
+
+}
+
 func main() {
 	N, _ := new(big.Int).SetString("27373176497986431932251251116443926663831806261071313412989844158826154814084495647335491185915655601666177981912915917513154667109854715685389256347698156167098286352963470578246399719078975590638921432718527013913639908860623319460907657961571096028464789764100067928297618269506856287203984333985334991680977184069499150590693164224823071048888338148038226506445470031874898694438134368521730060168857461554576831837880299721200508752202214917227818509186371000166250119754889508590004281188893160298827566989760562889798571576260058420518940759480974818966399516795337246357463835643099652311241207979328006473273", 10)
 	e, _ := new(big.Int).SetString("114555885618321971166525289009247562530684912588490288375374382656653624817637873641873338444064827244125181436880632068365026025194100187802604323676970718988010331197271572511319987984765105343287840472134128084868761183464484207489195971498946203121897312631812237101119681888221283146033802960204006054855", 10)
@@ -334,10 +360,22 @@ func main() {
 	mode := os.Args[1]
 	file := os.Args[2]
 	if mode == "-e" {
-		encrypt(N, e, read_file(file))
-		//Encrypt
+		encrypted_data := encrypt(N, e, read_file(file))
+		ioutil.WriteFile("encrypted.txt", encrypted_data, 0644)
 	} else if mode == "-d" {
 		//Decrypt
+		_, d := load_key(os.Args[3])
+		encrypted_data := read_file(os.Args[2])
+		Header := encrypted_data[:256]
+		//fmt.Printf("Header:%x\t with length:%d\n", Header, len(Header))
+
+		cipher_text := encrypted_data[256:]
+		big_header := new(big.Int).SetBytes(Header)
+		Kenc := Fast_exp(big_header, d, N).Bytes()
+		//fmt.Printf("Kenc:%x with length:%d\n", Kenc, len(Kenc))
+
+		plain_text := decrypt(Kenc, cipher_text)
+		ioutil.WriteFile("decrypted.txt", plain_text, 0644)
 		//pri_key_file := os.Args[3]
 	}
 	// big1 := big.NewInt(1)
