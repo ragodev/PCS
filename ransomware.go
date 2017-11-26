@@ -288,7 +288,7 @@ func encrypt(N *big.Int, e *big.Int, M []byte) []byte {
 
 	Kenc := make([]byte, 32)
 	rand.Read(Kenc)
-	fmt.Printf("Kenc:%x\n", Kenc)
+
 	C_ := AES_CBC_ENC(Kenc, IV_, M__)
 	C := append(IV, C_...)
 	//fmt.Printf("MSG after encryption: %x\n", C_)
