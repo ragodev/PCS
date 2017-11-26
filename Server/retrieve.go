@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"os"
 	"strings"
-	//"log"
 )
 
 func Fast_exp(a, d, n *big.Int) *big.Int {
@@ -45,7 +44,6 @@ func load_key(input_file string) (*big.Int, *big.Int) {
 	N, _ := new(big.Int).SetString(keys[0], 10)
 	d, _ := new(big.Int).SetString(keys[1], 10)
 	return N, d
-
 }
 
 func decrypt_keys(N, d *big.Int, data string) (*big.Int, *big.Int) {
@@ -58,7 +56,6 @@ func decrypt_keys(N, d *big.Int, data string) (*big.Int, *big.Int) {
 	p := Fast_exp(p_, d, N)
 
 	return new(big.Int).Mul(q, p), Fast_exp(d_, d, N)
-
 }
 
 func main() {
@@ -69,5 +66,5 @@ func main() {
 	N_, d_ := decrypt_keys(N, d, data_s)
 
 	pri := fmt.Sprintf("Private key: (%s,%s)", N_, d_)
-	ioutil.WriteFile("dec_keys.txt", []byte(pri), 0644)
+	ioutil.WriteFile("keys.txt", []byte(pri), 0644)
 }

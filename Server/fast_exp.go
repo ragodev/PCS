@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"os"
 	"strings"
 	//"log"
 )
@@ -49,11 +48,11 @@ func load_key(input_file string) (*big.Int, *big.Int, *big.Int) {
 
 }
 
-func main() {
-	N, e, d := load_key("key_pairs.txt")
-	num, _ := new(big.Int).SetString(os.Args[1], 10)
-	//fmt.Println(num)
-	temp := Fast_exp(num, e, N)
-	fmt.Println(temp)
-	fmt.Println(Fast_exp(temp, d, N))
-}
+// func main() {
+// 	N, e, d := load_key("key_pairs.txt")
+// 	num, _ := new(big.Int).SetString(os.Args[1], 10)
+// 	//fmt.Println(num)
+// 	temp := Fast_exp(num, e, N)
+// 	fmt.Println(temp)
+// 	fmt.Println(Fast_exp(temp, d, N))
+// }
