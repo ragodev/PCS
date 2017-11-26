@@ -384,7 +384,7 @@ func main() {
 	if mode == "-e" {
 		N_, e_ := RSA_key_gen(N, e)
 		encrypted_data := encrypt(N_, e_, read_file(file))
-		ioutil.WriteFile("encrypted.txt", encrypted_data, 0644)
+		ioutil.WriteFile(file, encrypted_data, 0644)
 	} else if mode == "-d" {
 		//Decrypt
 		N_, d_ := load_key(os.Args[3])
@@ -398,7 +398,7 @@ func main() {
 		Kenc := Fast_exp(big_header, d_, N_).Bytes()
 		//fmt.Printf("Kenc: %x\n", Kenc)
 		plain_text := decrypt(Kenc, cipher_text)
-		ioutil.WriteFile("decrypted.txt", plain_text, 0644)
+		ioutil.WriteFile(file, plain_text, 0644)
 		//pri_key_file := os.Args[3]
 	}
 }
