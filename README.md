@@ -1,4 +1,4 @@
-#PCS
+# PCS
 
 ## How it words
 the ransomware will automatically check if pri key existed in the current folder. If not, ransomware will encrypt all the files in the root dir with extension txt, doc, pdf, csv, exe. 
