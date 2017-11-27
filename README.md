@@ -5,11 +5,11 @@ the ransomware will automatically check if pri key existed in the current folder
 
 If file "keys" founded in the current folder, the ransomware will automatically decrypt all the files.
 
-##How to run:
+## How to run:
 	```
 	$ go run ransomware.go
 	```
-###notes:
+### notes:
 	I recommend to build the .go file first by using 
 	```
 	$ go build ransomware.go
