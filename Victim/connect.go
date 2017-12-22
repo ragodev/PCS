@@ -42,32 +42,6 @@ func get_bal(addr string) float64 {
 	return 10.0
 }
 
-//verify if the attacker provide correct key
-func ver_key() {
-
-}
-
-//provide host id and sha256 to attacker
-//ask the dec key
-func ask_dec(hash_value string) {
-	dir, _ := os.Getwd()
-	parent_dir := dir[:strings.LastIndex(dir, "/")]
-	cmd := fmt.Sprintf("%s/Attacker/retrieve", parent_dir)
-
-	var out bytes.Buffer
-	result := exec.Command(cmd, hash_value)
-	result.Stdout = &out
-	err := result.Run()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// keys := strings.Split(result[out.String().Index(out.String(), "(")+1:strings.Index(out.Sring(), ")")], ",")
-	// N, _ := new(big.Int).SetString(keys[0], 10)
-	// d, _ := new(big.Int).SetString(keys[1], 10)
-}
-
 //transfer BC from host id to target node id
 func transfer(addr string, target string, value string) bool {
 	addresses := addresses()
@@ -94,6 +68,36 @@ func transfer(addr string, target string, value string) bool {
 	//fmt.Println(results)
 	//fmt.Println(tolerance(results))
 	return tolerance(results)
+}
+
+//provide host id and sha256 to attacker
+//ask the dec key
+func ask_dec(hash_value string) string {
+	dir, _ := os.Getwd()
+	parent_dir := dir[:strings.LastIndex(dir, "/")]
+	cmd := fmt.Sprintf("%s/Attacker/retrieve", parent_dir)
+
+	var out bytes.Buffer
+	result := exec.Command(cmd, hash_value)
+	result.Stdout = &out
+	err := result.Run()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	return out.String()
+	// keys := strings.Split(result[out.String().Index(out.String(), "(")+1:strings.Index(out.Sring(), ")")], ",")
+	// N, _ := new(big.Int).SetString(keys[0], 10)
+	// d, _ := new(big.Int).SetString(keys[1], 10)
+}
+
+//verify if the attacker provide correct key
+func ver_key() {
+
+}
+
+func fin_tr() {
+
 }
 
 //fault torlerant
