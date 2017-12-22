@@ -70,6 +70,7 @@ func main() {
 	data_s := string(data[:])
 	N_, d_ := decrypt_keys(N, d, data_s)
 
-	pri := fmt.Sprintf("Private key: (%s,%s)", N_, d_)
-	ioutil.WriteFile("keys", []byte(pri), 0644)
+	// pri := fmt.Sprintf("Private key: (%s,%s)", N_, d_)
+	// ioutil.WriteFile("keys", []byte(pri), 0644)
+	fmt.Printf("Private key: (%s,%s)", N_, d_)
 }
