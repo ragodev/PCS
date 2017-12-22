@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/aes"
 	"crypto/rand"
@@ -17,22 +16,6 @@ import (
 	"strings"
 )
 
-//connect blockchain network
-//create corresponding node, 'folder' in network
-// func connect(addr string) {
-// 	paths := addresses()
-// 	find := false
-
-// 	for _, path := range paths{
-// 		addr_ := path[strings.LastIndex(temp, "/")+1:]
-// 		if addr_ == addr{
-// 			find = true
-// 		}
-// 	}
-
-// 	if addr
-// }
-
 //verify if the host has enough balance
 func ver_bal(addr string, bal float64) {
 	if get_bal(addr) < bal {
@@ -44,34 +27,34 @@ func ver_bal(addr string, bal float64) {
 //need each node in network check the addr in the chain.csv
 //then return the balance for that addr
 func get_bal(addr string) float64 {
-	result := 0.0
-	path := fmt.Sprintf("%s/chain.txt")
-	file, err := os.Open(path)
-	defer file.Close()
+	result := 10.0
+	// path := fmt.Sprintf("%s/chain.txt")
+	// file, err := os.Open(path)
+	// defer file.Close()
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	// Start reading from the file with a reader.
-	reader := bufio.NewReader(file)
+	// // Start reading from the file with a reader.
+	// reader := bufio.NewReader(file)
 
-	var line string
-	for {
-		line, err = reader.ReadString('\n')
-		//		fmt.Println(line)
-		lineString := strings.Split(line, " ")
-		if lineString[0] == addr {
-			result, err = strconv.ParseFloat(lineString[1], 64)
-			if err != nil {
-				log.Fatal(err)
-			}
-			fmt.Println(lineString[1])
-		}
-		if err != nil {
-			break
-		}
-	}
+	// var line string
+	// for {
+	// 	line, err = reader.ReadString('\n')
+	// 	//		fmt.Println(line)
+	// 	lineString := strings.Split(line, " ")
+	// 	if lineString[0] == addr {
+	// 		result, err = strconv.ParseFloat(lineString[1], 64)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 		fmt.Println(lineString[1])
+	// 	}
+	// 	if err != nil {
+	// 		break
+	// 	}
+	// }
 
 	return result
 
@@ -100,8 +83,6 @@ func transfer(addr string, target string, value string) bool {
 			results = append(results, false)
 		}
 	}
-	//fmt.Println(results)
-	//fmt.Println(tolerance(results))
 	return tolerance(results)
 }
 
@@ -122,9 +103,6 @@ func ask_key(hash_value string) string {
 		log.Fatal(err)
 	}
 	return out.String()
-	// keys := strings.Split(result[out.String().Index(out.String(), "(")+1:strings.Index(out.Sring(), ")")], ",")
-	// N, _ := new(big.Int).SetString(keys[0], 10)
-	// d, _ := new(big.Int).SetString(keys[1], 10)
 }
 
 //verify if the attacker provide correct key
@@ -361,7 +339,20 @@ func main() {
 		//fmt.Println(addr)
 		target := os.Args[2]
 		value := os.Args[3]
-		transfer(addr, target, value)
+		hash_value := os.Args[4]
+		if transfer(addr, target, value) == false {
+			fmt.Println("no enough balance")
+			os.Exit(0)
+		}
+		keys_ := ask_key(hash_value)
+		keys := strings.Split(keys_[strings.Index(keys_, "(")+1:strings.Index(keys_, ")")], ",")
+
+		if ver_key(keys[0], keys[1]) == false {
+			fmt.Println("key not valid")
+			os.Exit(0)
+		}
+		fmt.Println("success")
+
 	}
 	if cmd == "ak" {
 		hash_value := os.Args[2]
@@ -370,19 +361,11 @@ func main() {
 		keys := strings.Split(keys_[strings.Index(keys_, "(")+1:strings.Index(keys_, ")")], ",")
 		//fmt.Println(keys[0])
 		fmt.Println(ver_key(keys[0], keys[1]))
-		// N, _ := new(big.Int).SetString(keys[0], 10)
-		// d, _ := new(big.Int).SetString(keys[1], 10)
-
 	}
 	if cmd == "et" {
 		fmt.Print(e_test(os.Args[2], os.Args[3], os.Args[4]))
 	}
-	//fmt.Println(cmd)
-	//fmt.Println(ask_key(cmd))
-	//value := os.Args[2]
-	//fmt.Println(addresses())
-	//fmt.Println(tolerance([]bool{true, false, true, false}))
-	//fmt.Println(ver_bal("abc", 10.13))
+
 }
 
 //
