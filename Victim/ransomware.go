@@ -217,7 +217,7 @@ func AES_CBC_ENC(Kenc []byte, IV []byte, M []byte) []byte {
 func AES_CBC_DEC(Kenc []byte, IV []byte, C []byte) []byte {
 	var m []byte
 	temp := make([]byte, 16)
-
+	//fmt.Println(Kenc)
 	block, err := aes.NewCipher(Kenc)
 	if err != nil {
 		panic(err)
@@ -435,7 +435,11 @@ func main() {
 	} else if mode == "-d" {
 		//Decrypt
 		N_, d_ := load_key("keys")
+		//fmt.Println(N_)
+		//fmt.Println(d_)
+		//fmt.Println("mode d")
 		for _, path := range paths {
+			//fmt.Println(path)
 			encrypted_data := read_file(path)
 			Header := encrypted_data[:256]
 			//fmt.Printf("Header:%x\t with length:%d\n", Header, len(Header))

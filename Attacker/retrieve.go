@@ -61,7 +61,12 @@ func decrypt_keys(N, d *big.Int, data string) (*big.Int, *big.Int) {
 func main() {
 	key_file := os.Args[1]
 	N, d := load_key("pri")
-	data, _ := ioutil.ReadFile(key_file)
+	dir, _ := os.Getwd()
+
+	parent_dir := dir[:strings.LastIndex(dir, "/")]
+	key_file_loc := fmt.Sprintf("%s/Server/%s", parent_dir, key_file)
+	//fmt.Println(key_file_loc)
+	data, _ := ioutil.ReadFile(key_file_loc)
 	data_s := string(data[:])
 	N_, d_ := decrypt_keys(N, d, data_s)
 
