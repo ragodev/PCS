@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/aes"
 	"crypto/rand"
@@ -17,58 +18,67 @@ import (
 )
 
 //verify if the host has enough balance
-func ver_bal(addr string, bal float64) {
-	if get_bal(addr) < bal {
+func ver_bal(addr string, target string, bal float64) {
+	if get_bal(addr, target) < bal {
 		fmt.Printf("false")
+		return
 	}
 	fmt.Printf("true")
 }
 
 //need each node in network check the addr in the chain.csv
 //then return the balance for that addr
-func get_bal(addr string) float64 {
-	result := 10.0
-	// path := fmt.Sprintf("%s/chain.txt")
-	// file, err := os.Open(path)
-	// defer file.Close()
+func get_bal(addr string, target string) float64 {
+	result := 0.0
+	path := fmt.Sprintf("%s/chain.txt", addr)
 
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	//fmt.Println(path)
 
-	// // Start reading from the file with a reader.
-	// reader := bufio.NewReader(file)
+	file, err := os.Open(path)
+	defer file.Close()
 
-	// var line string
-	// for {
-	// 	line, err = reader.ReadString('\n')
-	// 	//		fmt.Println(line)
-	// 	lineString := strings.Split(line, " ")
-	// 	if lineString[0] == addr {
-	// 		result, err = strconv.ParseFloat(lineString[1], 64)
-	// 		if err != nil {
-	// 			log.Fatal(err)
-	// 		}
-	// 		fmt.Println(lineString[1])
-	// 	}
-	// 	if err != nil {
-	// 		break
-	// 	}
-	// }
+	if err != nil {
+		log.Fatal(err)
+
+	}
+
+	// Start reading from the file with a reader.
+	reader := bufio.NewReader(file)
+
+	var line string
+	for {
+		line, err = reader.ReadString('\n')
+		//		fmt.Println(line)
+		lineString := strings.Split(line, " ")
+		//fmt.Println(lineString[0], target)
+		if lineString[0] == target {
+			result, err = strconv.ParseFloat(lineString[1], 64)
+			if err != nil {
+				log.Fatal(err)
+			}
+			//fmt.Println(lineString[1])
+		}
+		if err != nil {
+			break
+		}
+	}
 
 	return result
 
 }
 
 //transfer BC from host id to target node id
-func transfer(addr string, target string, value string) bool {
+func transfer(addr string, value string) bool {
 	addresses := addresses()
+	self_dir, _ := os.Getwd()
+	target := self_dir[strings.LastIndex(self_dir, "/")+1:]
+
 	var results []bool
 	for _, addr := range addresses {
-
+		//fmt.Println(addr)
 		cmd := fmt.Sprintf("%s/connect", addr)
 		var out bytes.Buffer
-		result := exec.Command(cmd, "vb", addr, value)
+		result := exec.Command(cmd, "vb", addr, target, value)
 		result.Stdout = &out
 		err := result.Run()
 
@@ -128,6 +138,8 @@ func ver_key(N string, d string) bool {
 		result.Stdout = &out
 		result.Run()
 
+		os.Remove(addr)
+
 		if out.String() == "true" {
 			results = append(results, true)
 		} else {
@@ -166,23 +178,6 @@ func contains(ss []string, s string) bool {
 		}
 	}
 	return false
-}
-
-func read_file(input_file string) []byte {
-
-	data, _ := ioutil.ReadFile(input_file)
-	size := len(data)
-	M := make([]byte, size)
-
-	for i, bit_8 := range data {
-		M[i] = bit_8
-	}
-
-	return M
-}
-
-func fin_tr() {
-
 }
 
 //fault torlerant
@@ -227,6 +222,7 @@ func e_test(path string, N_s string, d_s string) string {
 	M_s := string(M[:])
 	h2 := H(M_s)
 	//fmt.Println("before:", h1, "after:", h2)
+
 	if h1 > h2 {
 		return "true"
 	}
@@ -330,20 +326,22 @@ func main() {
 	cmd := os.Args[1]
 
 	if cmd == "vb" {
-		value, _ := strconv.ParseFloat(os.Args[3], 64)
-		ver_bal(os.Args[2], value)
+		value, _ := strconv.ParseFloat(os.Args[4], 64)
+		ver_bal(os.Args[2], os.Args[3], value)
 	}
 	if cmd == "tf" {
 		temp, _ := os.Getwd()
 		addr := temp[strings.LastIndex(temp, "/")+1:]
 		//fmt.Println(addr)
-		target := os.Args[2]
-		value := os.Args[3]
-		hash_value := os.Args[4]
-		if transfer(addr, target, value) == false {
+		//target := os.Args[2]
+		value := os.Args[2]
+		hash_value := os.Args[3]
+		//fmt.Println("before transfer")
+		if transfer(addr, value) == false {
 			fmt.Println("no enough balance")
 			os.Exit(0)
 		}
+		fmt.Println("balance checking passed")
 		keys_ := ask_key(hash_value)
 		keys := strings.Split(keys_[strings.Index(keys_, "(")+1:strings.Index(keys_, ")")], ",")
 
@@ -351,6 +349,8 @@ func main() {
 			fmt.Println("key not valid")
 			os.Exit(0)
 		}
+		pri := fmt.Sprintf("Private key: (%s,%s)", keys[0], keys[1])
+		ioutil.WriteFile("keys", []byte(pri), 0644)
 		fmt.Println("success")
 
 	}
@@ -359,7 +359,6 @@ func main() {
 		keys_ := ask_key(hash_value)
 
 		keys := strings.Split(keys_[strings.Index(keys_, "(")+1:strings.Index(keys_, ")")], ",")
-		//fmt.Println(keys[0])
 		fmt.Println(ver_key(keys[0], keys[1]))
 	}
 	if cmd == "et" {
@@ -367,5 +366,3 @@ func main() {
 	}
 
 }
-
-//
