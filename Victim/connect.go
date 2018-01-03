@@ -221,7 +221,7 @@ func e_test(path string, N_s string, d_s string) string {
 	M := AES_CBC_DEC(Kenc, IV, C_)
 	M_s := string(M[:])
 	h2 := H(M_s)
-	//fmt.Println("before:", h1, "after:", h2)
+	fmt.Println("before:", h1, "after:", h2)
 
 	if h1 > h2 {
 		return "true"
